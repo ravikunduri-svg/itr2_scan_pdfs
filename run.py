@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from app import create_app
 from db.access import init_db
