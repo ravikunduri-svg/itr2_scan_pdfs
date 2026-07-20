@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>fin-rag</title></head>
+<body>
+<h1>fin-rag</h1>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for msg in messages %}<p>{{ msg }}</p>{% endfor %}
+  {% endif %}
+{% endwith %}
+<section id="docs">
+  {% for doc in docs %}
+    <div>{{ doc.filename }}
+      <form method="post" action="/delete/{{ doc.id }}">
+        <button type="submit">Delete</button>
+      </form>
+    </div>
+  {% endfor %}
+</section>
+<section id="chat">
+  {% for m in messages %}
+    <p><strong>{{ m.role }}</strong>: {{ m.content }}</p>
+  {% endfor %}
+</section>
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="file" accept=".pdf">
+  <input type="text" name="password" placeholder="PDF password (optional)">
+  <button type="submit">Upload</button>
+</form>
+</body>
+</html>

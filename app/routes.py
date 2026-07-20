@@ -1,6 +1,99 @@
 # app/routes.py
-from flask import Flask
+import os
+import tempfile
+from pathlib import Path
+
+from flask import (
+    Flask, request, redirect, url_for, render_template,
+    flash, jsonify, session
+)
+
+from core.ingest import ingest_pdf
+from core.retrieve import retrieve
+from core.answer import answer
+from db.access import (
+    get_all_documents, get_all_chunks, delete_document,
+    add_conversation, add_message, get_messages, init_db
+)
 
 
 def register(app: Flask) -> None:
-    pass  # Routes implemented in Task 5
+
+    @app.before_request
+    def _ensure_conv():
+        if "conv_id" not in session:
+            db_path = app.config["DB_PATH"]
+            init_db(db_path)
+            session["conv_id"] = add_conversation(db_path)
+
+    @app.route("/")
+    def index():
+        db_path = app.config["DB_PATH"]
+        docs = get_all_documents(db_path)
+        conv_id = session.get("conv_id")
+        messages = get_messages(db_path, conv_id) if conv_id else []
+        return render_template("index.html", docs=docs, messages=messages)
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        db_path = app.config["DB_PATH"]
+        upload_dir = app.config["UPLOAD_FOLDER"]
+        f = request.files.get("file")
+        password = request.form.get("password", "")
+
+        if not f or not f.filename:
+            flash("No file selected.")
+            return redirect(url_for("index"))
+
+        if not f.filename.lower().endswith(".pdf"):
+            flash("Only PDF files are accepted.")
+            return redirect(url_for("index"))
+
+        Path(upload_dir).mkdir(parents=True, exist_ok=True)
+        dest = os.path.join(upload_dir, f.filename)
+        f.save(dest)
+
+        try:
+            ingest_pdf(dest, f.filename, db_path, password)
+            flash(f"Uploaded and indexed: {f.filename}")
+        except Exception as exc:
+            if "PasswordIncorrect" in repr(exc) or "PdfminerException" in type(exc).__name__:
+                flash("Incorrect or missing PDF password.")
+            else:
+                flash(f"Could not process PDF: {type(exc).__name__}: {exc}")
+
+        return redirect(url_for("index"))
+
+    @app.route("/delete/<int:doc_id>", methods=["POST"])
+    def delete(doc_id):
+        db_path = app.config["DB_PATH"]
+        delete_document(db_path, doc_id)
+        flash("Document deleted.")
+        return redirect(url_for("index"))
+
+    @app.route("/ask", methods=["POST"])
+    def ask():
+        db_path = app.config["DB_PATH"]
+        data = request.get_json(silent=True) or {}
+        question = (data.get("question") or "").strip()
+        if not question:
+            return jsonify({"error": "question is required"}), 400
+
+        api_key = os.environ.get("GROK_API_KEY", "")
+        chunks = get_all_chunks(db_path)
+        top_chunks = retrieve(question, chunks, top_k=5)
+        result = answer(question, top_chunks, api_key)
+
+        conv_id = session.get("conv_id")
+        if conv_id:
+            add_message(db_path, conv_id, "user", question)
+            add_message(db_path, conv_id, "assistant", result)
+
+        return jsonify({"answer": result})
+
+    @app.route("/history")
+    def history():
+        db_path = app.config["DB_PATH"]
+        conv_id = session.get("conv_id")
+        messages = get_messages(db_path, conv_id) if conv_id else []
+        return jsonify([{"role": m["role"], "content": m["content"]} for m in messages])
