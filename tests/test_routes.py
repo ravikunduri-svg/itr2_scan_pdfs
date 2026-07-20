@@ -1,4 +1,4 @@
-import os, tempfile, pytest
+import os, pytest
 from unittest.mock import patch
 from app import create_app
 from db.access import init_db
