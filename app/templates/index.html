@@ -1,31 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>fin-rag</title></head>
+<head>
+  <meta charset="UTF-8">
+  <title>fin-rag — Financial Document Q&amp;A</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
+    header { background: #1a1a2e; color: #fff; padding: 0.75rem 1.5rem; font-size: 1.1rem; font-weight: 600; }
+    .container { display: flex; flex: 1; overflow: hidden; }
+
+    /* Left panel */
+    .left { width: 300px; min-width: 260px; background: #fff; border-right: 1px solid #ddd;
+            display: flex; flex-direction: column; overflow: hidden; }
+    .left h2 { font-size: 0.85rem; text-transform: uppercase; color: #666; padding: 1rem; border-bottom: 1px solid #eee; }
+    .doc-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+    .doc-item { display: flex; justify-content: space-between; align-items: center;
+                padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 4px; background: #f8f9fa; font-size: 0.85rem; }
+    .doc-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
+    .doc-item form { margin: 0; }
+    .del-btn { background: none; border: none; color: #cc0000; cursor: pointer; font-size: 1rem; padding: 0 4px; }
+    .upload-form { padding: 0.75rem; border-top: 1px solid #eee; }
+    .upload-form label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; }
+    .upload-form input[type=file] { width: 100%; font-size: 0.8rem; margin-bottom: 6px; }
+    .upload-form input[type=password] { width: 100%; padding: 4px 8px; font-size: 0.8rem;
+                                        border: 1px solid #ccc; border-radius: 4px; margin-bottom: 6px; }
+    .upload-btn { width: 100%; padding: 6px; background: #1a1a2e; color: #fff;
+                  border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+
+    /* Flash messages */
+    .flash { background: #fff3cd; border: 1px solid #ffc107; color: #664d03;
+             padding: 0.5rem 1rem; font-size: 0.85rem; }
+
+    /* Right panel */
+    .right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-history { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .msg { max-width: 75%; border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .msg.user { background: #1a1a2e; color: #fff; align-self: flex-end; }
+    .msg.assistant { background: #fff; border: 1px solid #ddd; align-self: flex-start; }
+    .chat-input { display: flex; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid #ddd; background: #fff; }
+    .chat-input textarea { flex: 1; resize: none; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
+    .chat-input button { padding: 0.5rem 1.25rem; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .empty-state { color: #999; font-size: 0.9rem; text-align: center; margin: auto; }
+  </style>
+</head>
 <body>
-<h1>fin-rag</h1>
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    {% for msg in messages %}<p>{{ msg }}</p>{% endfor %}
-  {% endif %}
-{% endwith %}
-<section id="docs">
-  {% for doc in docs %}
-    <div>{{ doc.filename }}
-      <form method="post" action="/delete/{{ doc.id }}">
-        <button type="submit">Delete</button>
-      </form>
+  <header>fin-rag — Financial Document Q&amp;A</header>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="flash">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="container">
+    <!-- Left: documents -->
+    <div class="left">
+      <h2>Documents ({{ docs|length }})</h2>
+      <div class="doc-list">
+        {% if docs %}
+          {% for doc in docs %}
+            <div class="doc-item">
+              <span title="{{ doc.filename }}">{{ doc.filename }}</span>
+              <form method="post" action="/delete/{{ doc.id }}"
+                    onsubmit="return confirm('Delete {{ doc.filename }}?')">
+                <button class="del-btn" type="submit" title="Delete">&#x2715;</button>
+              </form>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="font-size:0.8rem;color:#999;padding:0.5rem;">No documents uploaded.</p>
+        {% endif %}
+      </div>
+      <div class="upload-form">
+        <form method="post" action="/upload" enctype="multipart/form-data">
+          <label>PDF file</label>
+          <input type="file" name="file" accept=".pdf" required>
+          <label>Password (if protected)</label>
+          <input type="password" name="password" placeholder="Leave blank if none">
+          <button class="upload-btn" type="submit">Upload</button>
+        </form>
+      </div>
     </div>
-  {% endfor %}
-</section>
-<section id="chat">
-  {% for m in messages %}
-    <p><strong>{{ m.role }}</strong>: {{ m.content }}</p>
-  {% endfor %}
-</section>
-<form method="post" action="/upload" enctype="multipart/form-data">
-  <input type="file" name="file" accept=".pdf">
-  <input type="text" name="password" placeholder="PDF password (optional)">
-  <button type="submit">Upload</button>
-</form>
+
+    <!-- Right: chat -->
+    <div class="right">
+      <div class="chat-history" id="chat">
+        {% if messages %}
+          {% for m in messages %}
+            <div class="msg {{ m.role }}">{{ m.content }}</div>
+          {% endfor %}
+        {% else %}
+          <p class="empty-state">Upload documents and ask a question.</p>
+        {% endif %}
+      </div>
+      <div class="chat-input">
+        <textarea id="q" rows="2" placeholder="Ask about your financial documents..."></textarea>
+        <button id="ask-btn" onclick="ask()">Ask</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const qInput = document.getElementById("q");
+    const btn = document.getElementById("ask-btn");
+
+    // Scroll to bottom on load
+    chat.scrollTop = chat.scrollHeight;
+
+    qInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        ask();
+      }
+    });
+
+    function appendMsg(role, text) {
+      const empty = chat.querySelector(".empty-state");
+      if (empty) empty.remove();
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function ask() {
+      const question = qInput.value.trim();
+      if (!question) return;
+      btn.disabled = true;
+      qInput.value = "";
+      appendMsg("user", question);
+      appendMsg("assistant", "Thinking...");
+      const thinking = chat.lastChild;
+
+      try {
+        const resp = await fetch("/ask", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({question})
+        });
+        const data = await resp.json();
+        thinking.textContent = data.answer || data.error || "No response.";
+      } catch (err) {
+        thinking.textContent = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+        chat.scrollTop = chat.scrollHeight;
+      }
+    }
+  </script>
 </body>
 </html>
