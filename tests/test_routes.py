@@ -48,8 +48,9 @@ def test_delete_redirects(client, tmp_path):
 
 def test_ask_returns_json(client):
     with patch("app.routes.get_all_chunks", return_value=[]):
-        with patch("app.routes.answer", return_value="Answer: None\nConfidence: LOW\nSources: None"):
-            resp = client.post("/ask", json={"question": "What is my salary?"})
+        with patch("app.routes.retrieve", return_value=[]):
+            with patch("app.routes.answer", return_value="Answer: None\nConfidence: LOW\nSources: None"):
+                resp = client.post("/ask", json={"question": "What is my salary?"})
     assert resp.status_code == 200
     data = resp.get_json()
     assert "answer" in data

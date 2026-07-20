@@ -1,6 +1,5 @@
 # app/routes.py
 import os
-import tempfile
 from pathlib import Path
 
 from flask import (
@@ -61,6 +60,10 @@ def register(app: Flask) -> None:
                 flash("Incorrect or missing PDF password.")
             else:
                 flash(f"Could not process PDF: {type(exc).__name__}: {exc}")
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
 
         return redirect(url_for("index"))
 
