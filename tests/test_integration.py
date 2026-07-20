@@ -61,9 +61,10 @@ def test_ask_endpoint_returns_answer(app_with_data):
         "Confidence: HIGH\n"
         "Sources:\n- Document: form16.pdf, Page 5: \"(d) Total 93200840.00\""
     )
-    with patch("core.answer.OpenAI") as mock_cls:
-        mock_cls.return_value.chat.completions.create.return_value = _mock_grok(grok_answer)
-        resp = client.post("/ask", json={"question": "What is my gross salary?"})
+    with patch.dict(os.environ, {"GROK_API_KEY": "test-key"}):
+        with patch("core.answer.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = _mock_grok(grok_answer)
+            resp = client.post("/ask", json={"question": "What is my gross salary?"})
 
     assert resp.status_code == 200
     data = resp.get_json()
@@ -74,9 +75,10 @@ def test_ask_endpoint_returns_answer(app_with_data):
 def test_ask_stores_messages_in_history(app_with_data):
     client, _ = app_with_data
     grok_answer = "Answer: Rs 93,20,084.\nConfidence: HIGH\nSources:\n- Document: form16.pdf, Page 5: \"...\""
-    with patch("core.answer.OpenAI") as mock_cls:
-        mock_cls.return_value.chat.completions.create.return_value = _mock_grok(grok_answer)
-        client.post("/ask", json={"question": "salary?"})
+    with patch.dict(os.environ, {"GROK_API_KEY": "test-key"}):
+        with patch("core.answer.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = _mock_grok(grok_answer)
+            client.post("/ask", json={"question": "salary?"})
 
     hist_resp = client.get("/history")
     history = hist_resp.get_json()
@@ -106,6 +108,7 @@ def test_ask_no_docs_returns_no_docs_message(tmp_path):
     app.config["UPLOAD_FOLDER"] = upload_dir
     app.config["TESTING"] = True
     with app.test_client() as c:
-        resp = c.post("/ask", json={"question": "What is my salary?"})
+        with patch.dict(os.environ, {"GROK_API_KEY": "test-key"}):
+            resp = c.post("/ask", json={"question": "What is my salary?"})
     data = resp.get_json()
     assert "No documents" in data["answer"]

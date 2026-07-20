@@ -42,12 +42,15 @@ def answer(question: str, chunks: list, api_key: str) -> str:
     user_message = f"Document excerpts:\n\n{context}\n\nQuestion: {question}"
 
     client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
-    response = client.chat.completions.create(
-        model="grok-3-mini",
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=0,
-    )
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="grok-3-mini",
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0,
+        )
+        return response.choices[0].message.content
+    except Exception as exc:
+        return f"Answer: Unable to generate answer ({type(exc).__name__}: {exc})\nConfidence: LOW\nSources: None"

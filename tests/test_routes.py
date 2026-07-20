@@ -25,7 +25,7 @@ def test_upload_rejects_non_pdf(client):
     assert resp.status_code == 302  # redirect after flash
     # Follow redirect
     resp2 = client.get("/")
-    assert b"PDF" in resp2.data or resp.status_code == 302
+    assert b"PDF" in resp2.data
 
 def test_upload_pdf_calls_ingest(client, tmp_path):
     dummy_pdf = tmp_path / "dummy.pdf"
@@ -47,10 +47,11 @@ def test_delete_redirects(client, tmp_path):
     assert resp.status_code == 302
 
 def test_ask_returns_json(client):
-    with patch("app.routes.get_all_chunks", return_value=[]):
-        with patch("app.routes.retrieve", return_value=[]):
-            with patch("app.routes.answer", return_value="Answer: None\nConfidence: LOW\nSources: None"):
-                resp = client.post("/ask", json={"question": "What is my salary?"})
+    with patch.dict(os.environ, {"GROK_API_KEY": "test-key"}):
+        with patch("app.routes.get_all_chunks", return_value=[]):
+            with patch("app.routes.retrieve", return_value=[]):
+                with patch("app.routes.answer", return_value="Answer: None\nConfidence: LOW\nSources: None"):
+                    resp = client.post("/ask", json={"question": "What is my salary?"})
     assert resp.status_code == 200
     data = resp.get_json()
     assert "answer" in data

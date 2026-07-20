@@ -6,13 +6,14 @@ from flask import (
     Flask, request, redirect, url_for, render_template,
     flash, jsonify, session
 )
+from werkzeug.utils import secure_filename
 
 from core.ingest import ingest_pdf
 from core.retrieve import retrieve
 from core.answer import answer
 from db.access import (
     get_all_documents, get_all_chunks, delete_document,
-    add_conversation, add_message, get_messages, init_db
+    add_conversation, add_message, get_messages
 )
 
 
@@ -22,7 +23,6 @@ def register(app: Flask) -> None:
     def _ensure_conv():
         if "conv_id" not in session:
             db_path = app.config["DB_PATH"]
-            init_db(db_path)
             session["conv_id"] = add_conversation(db_path)
 
     @app.route("/")
@@ -48,13 +48,18 @@ def register(app: Flask) -> None:
             flash("Only PDF files are accepted.")
             return redirect(url_for("index"))
 
+        safe_name = secure_filename(f.filename)
+        if not safe_name:
+            flash("Invalid filename.")
+            return redirect(url_for("index"))
+
         Path(upload_dir).mkdir(parents=True, exist_ok=True)
-        dest = os.path.join(upload_dir, f.filename)
+        dest = os.path.join(upload_dir, safe_name)
         f.save(dest)
 
         try:
-            ingest_pdf(dest, f.filename, db_path, password)
-            flash(f"Uploaded and indexed: {f.filename}")
+            ingest_pdf(dest, safe_name, db_path, password)
+            flash(f"Uploaded and indexed: {safe_name}")
         except Exception as exc:
             if "PasswordIncorrect" in repr(exc) or "PdfminerException" in type(exc).__name__:
                 flash("Incorrect or missing PDF password.")
@@ -70,7 +75,21 @@ def register(app: Flask) -> None:
     @app.route("/delete/<int:doc_id>", methods=["POST"])
     def delete(doc_id):
         db_path = app.config["DB_PATH"]
+        upload_dir = app.config["UPLOAD_FOLDER"]
+
+        # Get filename before deleting from DB
+        docs = get_all_documents(db_path)
+        doc = next((d for d in docs if d["id"] == doc_id), None)
+
         delete_document(db_path, doc_id)
+
+        if doc:
+            file_path = os.path.join(upload_dir, doc["filename"])
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+
         flash("Document deleted.")
         return redirect(url_for("index"))
 
@@ -83,6 +102,8 @@ def register(app: Flask) -> None:
             return jsonify({"error": "question is required"}), 400
 
         api_key = os.environ.get("GROK_API_KEY", "")
+        if not api_key:
+            return jsonify({"error": "GROK_API_KEY environment variable is not set"}), 503
         chunks = get_all_chunks(db_path)
         top_chunks = retrieve(question, chunks, top_k=5)
         result = answer(question, top_chunks, api_key)
