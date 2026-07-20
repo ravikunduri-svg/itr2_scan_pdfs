@@ -19,12 +19,6 @@ from db.access import (
 
 def register(app: Flask) -> None:
 
-    @app.before_request
-    def _ensure_conv():
-        if "conv_id" not in session:
-            db_path = app.config["DB_PATH"]
-            session["conv_id"] = add_conversation(db_path)
-
     @app.route("/")
     def index():
         db_path = app.config["DB_PATH"]
@@ -55,6 +49,12 @@ def register(app: Flask) -> None:
 
         Path(upload_dir).mkdir(parents=True, exist_ok=True)
         dest = os.path.join(upload_dir, safe_name)
+
+        existing_docs = get_all_documents(db_path)
+        if any(d["filename"] == safe_name for d in existing_docs):
+            flash(f"A document named '{safe_name}' is already uploaded. Delete it first to re-upload.")
+            return redirect(url_for("index"))
+
         f.save(dest)
 
         try:
@@ -109,9 +109,11 @@ def register(app: Flask) -> None:
         result = answer(question, top_chunks, api_key)
 
         conv_id = session.get("conv_id")
-        if conv_id:
-            add_message(db_path, conv_id, "user", question)
-            add_message(db_path, conv_id, "assistant", result)
+        if conv_id is None:
+            conv_id = add_conversation(db_path)
+            session["conv_id"] = conv_id
+        add_message(db_path, conv_id, "user", question)
+        add_message(db_path, conv_id, "assistant", result)
 
         return jsonify({"answer": result})
 

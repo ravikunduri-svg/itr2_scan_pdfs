@@ -1,5 +1,5 @@
 import pdfplumber
-from db.access import add_document, add_chunk
+from db.access import add_document, add_chunk, delete_document
 
 
 def extract_pages(pdf_path: str, password: str = "") -> list:
@@ -17,6 +17,10 @@ def ingest_pdf(pdf_path: str, filename: str, db_path: str, password: str = "") -
     """Extract text from pdf_path, store as document + chunks in DB. Returns doc_id."""
     pages = extract_pages(pdf_path, password)
     doc_id = add_document(db_path, filename, len(pages))
-    for page in pages:
-        add_chunk(db_path, doc_id, page["page_num"], page["text"])
+    try:
+        for page in pages:
+            add_chunk(db_path, doc_id, page["page_num"], page["text"])
+    except Exception:
+        delete_document(db_path, doc_id)
+        raise
     return doc_id

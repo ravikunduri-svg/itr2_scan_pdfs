@@ -7,6 +7,11 @@ def create_app(db_path: str = "data/fin_rag.db") -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB limit
     app.secret_key = "dev-secret-change-in-prod"
 
+    from db.access import init_db
+    from pathlib import Path
+    Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    init_db(db_path)
+
     from app import routes
     routes.register(app)
 
