@@ -101,9 +101,9 @@ def register(app: Flask) -> None:
         if not question:
             return jsonify({"error": "question is required"}), 400
 
-        api_key = os.environ.get("GROK_API_KEY", "")
+        api_key = os.environ.get("GROQ_API_KEY", "")
         if not api_key:
-            return jsonify({"error": "GROK_API_KEY environment variable is not set"}), 503
+            return jsonify({"error": "GROQ_API_KEY environment variable is not set"}), 503
         chunks = get_all_chunks(db_path)
         top_chunks = retrieve(question, chunks, top_k=5)
         result = answer(question, top_chunks, api_key)

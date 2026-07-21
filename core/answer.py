@@ -34,17 +34,17 @@ def _build_context(chunks: list) -> str:
 
 
 def answer(question: str, chunks: list, api_key: str) -> str:
-    """Call Grok API with question + retrieved chunks. Returns structured answer string."""
+    """Call Groq API with question + retrieved chunks. Returns structured answer string."""
     if not chunks:
         return NO_DOCS_RESPONSE
 
     context = _build_context(chunks)
     user_message = f"Document excerpts:\n\n{context}\n\nQuestion: {question}"
 
-    client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+    client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
     try:
         response = client.chat.completions.create(
-            model="grok-3-mini",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
